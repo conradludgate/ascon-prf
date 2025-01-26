@@ -2,7 +2,8 @@ use ascon::State;
 use digest::{
     block_buffer::Eager,
     core_api::{
-        BlockSizeUser, BufferKindUser, CoreWrapper, ExtendableOutputCore, UpdateCore, XofReaderCore,
+        AlgorithmName, BlockSizeUser, BufferKindUser, CoreWrapper, ExtendableOutputCore,
+        UpdateCore, XofReaderCore,
     },
     crypto_common::KeySizeUser,
     KeyInit,
@@ -17,6 +18,18 @@ pub struct AsconPrfCore {
     state: State,
 }
 
+impl AlgorithmName for AsconPrfCore {
+    fn write_alg_name(f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.write_str("Ascon-PRF")
+    }
+}
+
+impl AlgorithmName for AsconPrfReaderCore {
+    fn write_alg_name(f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.write_str("Ascon-PRF")
+    }
+}
+
 pub type AsconPrf = CoreWrapper<AsconPrfCore>;
 
 impl KeySizeUser for AsconPrfCore {
@@ -24,8 +37,9 @@ impl KeySizeUser for AsconPrfCore {
 }
 
 impl KeyInit for AsconPrfCore {
+    #[inline(always)]
     fn new(key: &digest::Key<Self>) -> Self {
-        const IV: u64 = 0x80808c0000000000;
+        const IV: u64 = 0x00000000008c8080;
         Self {
             state: crate::init(IV, key),
         }
@@ -53,7 +67,7 @@ impl ExtendableOutputCore for AsconPrfCore {
         &mut self,
         buffer: &mut digest::core_api::Buffer<Self>,
     ) -> Self::ReaderCore {
-        buffer.digest_pad(0x80, &[], |block| {
+        buffer.digest_pad(0x01, &[], |block| {
             compress(&mut self.state, block, 1);
         });
         AsconPrfReaderCore {
@@ -103,26 +117,26 @@ pub fn ascon_prf_short_128(key: [u8; 16], data: &[u8; 16]) -> [u8; 16] {
 }
 
 fn ascon_prf_short_inner(key: B<U16>, m: u64, t: u64, data: B<U16>) -> B<U16> {
-    const IV: u64 = 0x80004c0000000000;
-    let iv = IV ^ (m << 51) ^ (t << 35);
+    const IV: u64 = 0x00000000004c0080;
+    let iv = IV ^ (m << 11) ^ (t << 27);
 
     let (k0, k1): (B<U8>, B<U8>) = key.split();
-    let k0 = u64::from_be_bytes(k0.into());
-    let k1 = u64::from_be_bytes(k1.into());
+    let k0 = u64::from_le_bytes(k0.into());
+    let k1 = u64::from_le_bytes(k1.into());
 
     let (m0, m1): (B<U8>, B<U8>) = data.split();
-    let m0 = u64::from_be_bytes(m0.into());
-    let m1 = u64::from_be_bytes(m1.into());
+    let m0 = u64::from_le_bytes(m0.into());
+    let m1 = u64::from_le_bytes(m1.into());
 
     let mut state = State::new(iv, k0, k1, m0, m1);
     state.permute_12();
 
-    let t0 = k0 ^ state[0];
-    let t1 = k1 ^ state[1];
+    let t0 = k0 ^ state[3];
+    let t1 = k1 ^ state[4];
 
     let mut t = B::default();
-    t[0..8].copy_from_slice(&t0.to_be_bytes());
-    t[8..16].copy_from_slice(&t1.to_be_bytes());
+    t[0..8].copy_from_slice(&t0.to_le_bytes());
+    t[8..16].copy_from_slice(&t1.to_le_bytes());
     t
 }
 
@@ -146,8 +160,8 @@ mod tests {
         assert_eq!(
             output,
             [
-                46, 104, 127, 86, 54, 152, 22, 78, 150, 134, 48, 192, 187, 185, 66, 129, 7, 212,
-                156, 9, 201, 50, 248, 6, 166, 3, 165, 82, 245, 211, 37, 250
+                248, 122, 131, 117, 74, 8, 141, 9, 176, 167, 131, 133, 93, 137, 113, 113, 58, 236,
+                223, 69, 48, 231, 225, 74, 83, 238, 168, 10, 39, 80, 11, 155
             ]
         );
     }

@@ -30,8 +30,8 @@ type B<N> = GenericArray<u8, N>;
 
 fn init(iv: u64, key: &B<U16>) -> State {
     let (k0, k1): (&B<U8>, &B<U8>) = key.split();
-    let k0 = u64::from_be_bytes((*k0).into());
-    let k1 = u64::from_be_bytes((*k1).into());
+    let k0 = u64::from_le_bytes((*k0).into());
+    let k1 = u64::from_le_bytes((*k1).into());
     let mut state = State::new(iv, k0, k1, 0, 0);
     state.permute_12();
     state
@@ -41,10 +41,10 @@ fn compress(s: &mut State, x: &B<U32>, last: u64) {
     let (x01, x23): (&B<U16>, &B<U16>) = x.split();
     let (x0, x1): (&B<U8>, &B<U8>) = x01.split();
     let (x2, x3): (&B<U8>, &B<U8>) = x23.split();
-    let x0 = u64::from_be_bytes((*x0).into());
-    let x1 = u64::from_be_bytes((*x1).into());
-    let x2 = u64::from_be_bytes((*x2).into());
-    let x3 = u64::from_be_bytes((*x3).into());
+    let x0 = u64::from_le_bytes((*x0).into());
+    let x1 = u64::from_le_bytes((*x1).into());
+    let x2 = u64::from_le_bytes((*x2).into());
+    let x3 = u64::from_le_bytes((*x3).into());
 
     s[0] ^= x0;
     s[1] ^= x1;
@@ -56,6 +56,6 @@ fn compress(s: &mut State, x: &B<U32>, last: u64) {
 
 fn extract(s: &State, b: &mut B<U16>) {
     let (o0, o1): (&mut B<U8>, &mut B<U8>) = b.split();
-    *o0 = s[0].to_be_bytes().into();
-    *o1 = s[1].to_be_bytes().into();
+    *o0 = s[0].to_le_bytes().into();
+    *o1 = s[1].to_le_bytes().into();
 }

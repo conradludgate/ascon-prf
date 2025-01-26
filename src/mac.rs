@@ -1,7 +1,9 @@
 use ascon::State;
 use digest::{
     block_buffer::Eager,
-    core_api::{BlockSizeUser, BufferKindUser, CoreWrapper, FixedOutputCore, UpdateCore},
+    core_api::{
+        AlgorithmName, BlockSizeUser, BufferKindUser, CoreWrapper, FixedOutputCore, UpdateCore,
+    },
     crypto_common::{KeyInit, KeySizeUser},
     MacMarker, OutputSizeUser,
 };
@@ -20,9 +22,16 @@ impl KeySizeUser for AsconMacCore {
     type KeySize = U16;
 }
 
+impl AlgorithmName for AsconMacCore {
+    fn write_alg_name(f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.write_str("Ascon-Mac")
+    }
+}
+
 impl KeyInit for AsconMacCore {
+    #[inline(always)]
     fn new(key: &digest::Key<Self>) -> Self {
-        const IV: u64 = 0x80808c0000000080;
+        const IV: u64 = 0x00000080008c8080;
         Self {
             state: crate::init(IV, key),
         }
@@ -53,7 +62,7 @@ impl FixedOutputCore for AsconMacCore {
         buffer: &mut digest::core_api::Buffer<Self>,
         out: &mut digest::Output<Self>,
     ) {
-        buffer.digest_pad(0x80, &[], |block| {
+        buffer.digest_pad(0x01, &[], |block| {
             compress(&mut self.state, block, 1);
         });
         extract(&self.state, out);
@@ -78,7 +87,7 @@ mod tests {
 
         assert_eq!(
             &output[..],
-            &[55, 200, 95, 61, 117, 243, 181, 94, 60, 50, 44, 233, 243, 135, 52, 117]
+            &[53, 224, 223, 219, 242, 104, 181, 209, 23, 144, 216, 69, 242, 73, 137, 139]
         );
 
         let mut mac = AsconMac::new(b"0123456789abcdef".into());
