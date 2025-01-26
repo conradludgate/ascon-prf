@@ -60,7 +60,7 @@ checksum = "5f0e716048a18530cce4684daf98a7563a499d710e1ed8ef35567fcb43a7c5f1"
 
 [[package]]
 name = "ascon-prng"
-version = "0.2.0"
+version = "0.2.1"
 dependencies = [
  "ascon",
  "digest",
