@@ -5,6 +5,7 @@ use digest::{
     crypto_common::{KeyInit, KeySizeUser},
     MacMarker, OutputSizeUser,
 };
+use generic_array::{sequence::Split, GenericArray};
 
 pub struct AsconMacCore {
     state: State,
@@ -20,8 +21,9 @@ impl KeyInit for AsconMacCore {
     fn new(key: &digest::Key<Self>) -> Self {
         const IV: u64 = 0x80808c0000000080;
 
-        let k0 = u64::from_be_bytes(key[0..8].try_into().unwrap());
-        let k1 = u64::from_be_bytes(key[8..16].try_into().unwrap());
+        let (k0, k1): (&B<typenum::consts::U8>, &B<typenum::consts::U8>) = key.split();
+        let k0 = u64::from_be_bytes((*k0).into());
+        let k1 = u64::from_be_bytes((*k1).into());
         let mut state = State::new(IV, k0, k1, 0, 0);
         state.permute_12();
         Self { state }
@@ -36,13 +38,18 @@ impl BufferKindUser for AsconMacCore {
     type BufferKind = Eager;
 }
 
+type B<N> = GenericArray<u8, N>;
+
 impl UpdateCore for AsconMacCore {
     fn update_blocks(&mut self, blocks: &[digest::core_api::Block<Self>]) {
         for block in blocks {
-            let x0 = u64::from_be_bytes(block[0..8].try_into().unwrap());
-            let x1 = u64::from_be_bytes(block[8..16].try_into().unwrap());
-            let x2 = u64::from_be_bytes(block[16..24].try_into().unwrap());
-            let x3 = u64::from_be_bytes(block[24..32].try_into().unwrap());
+            let (x01, x23): (&B<typenum::consts::U16>, &B<typenum::consts::U16>) = block.split();
+            let (x0, x1): (&B<typenum::consts::U8>, &B<typenum::consts::U8>) = x01.split();
+            let (x2, x3): (&B<typenum::consts::U8>, &B<typenum::consts::U8>) = x23.split();
+            let x0 = u64::from_be_bytes((*x0).into());
+            let x1 = u64::from_be_bytes((*x1).into());
+            let x2 = u64::from_be_bytes((*x2).into());
+            let x3 = u64::from_be_bytes((*x3).into());
 
             self.state[0] ^= x0;
             self.state[1] ^= x1;
@@ -64,10 +71,13 @@ impl FixedOutputCore for AsconMacCore {
         out: &mut digest::Output<Self>,
     ) {
         buffer.digest_pad(0x80, &[], |block| {
-            let x0 = u64::from_be_bytes(block[0..8].try_into().unwrap());
-            let x1 = u64::from_be_bytes(block[8..16].try_into().unwrap());
-            let x2 = u64::from_be_bytes(block[16..24].try_into().unwrap());
-            let x3 = u64::from_be_bytes(block[24..32].try_into().unwrap());
+            let (x01, x23): (&B<typenum::consts::U16>, &B<typenum::consts::U16>) = block.split();
+            let (x0, x1): (&B<typenum::consts::U8>, &B<typenum::consts::U8>) = x01.split();
+            let (x2, x3): (&B<typenum::consts::U8>, &B<typenum::consts::U8>) = x23.split();
+            let x0 = u64::from_be_bytes((*x0).into());
+            let x1 = u64::from_be_bytes((*x1).into());
+            let x2 = u64::from_be_bytes((*x2).into());
+            let x3 = u64::from_be_bytes((*x3).into());
 
             self.state[0] ^= x0;
             self.state[1] ^= x1;

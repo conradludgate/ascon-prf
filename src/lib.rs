@@ -12,6 +12,7 @@
 //! <https://keccak.team/files/SpongePRNG.pdf>
 //!
 //! This crate has not been audited. Use at your own risk.
+#![no_std]
 
 mod prf;
 pub use prf::{AsconPrf, ascon_prf_short, ascon_prf_short_128};
