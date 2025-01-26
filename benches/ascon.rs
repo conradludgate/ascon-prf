@@ -1,6 +1,6 @@
 use divan::{black_box, counter::BytesCount, Bencher};
 
-use ascon_prf::{ascon_prf_short_128, AsconPrf};
+use ascon_prng::{ascon_prf_short_128, AsconPrf};
 use rand_core::{block::BlockRng64, RngCore};
 
 fn main() {

@@ -15,7 +15,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5f0e716048a18530cce4684daf98a7563a499d710e1ed8ef35567fcb43a7c5f1"
 
 [[package]]
-name = "ascon-prf"
+name = "ascon-prng"
 version = "0.1.0"
 dependencies = [
  "ascon",
