@@ -1,0 +1,19 @@
+[package]
+name = "ascon-prf"
+version = "0.1.0"
+edition = "2021"
+license = "Apache-2.0 OR MIT"
+repository = "https://github.com/conradludgate/ascon-prf"
+description = "Ascon-PRF is lightweight PRF. This implementation also offers an RNG based on this construction"
+authors = ["Conrad Ludgate <conradludgate@gmail.com>"]
+
+[dependencies]
+ascon = "0.4.0"
+rand_core = "0.6"
+
+[dev-dependencies]
+divan = "0.1.17"
+
+[[bench]]
+name = "ascon"
+harness = false
