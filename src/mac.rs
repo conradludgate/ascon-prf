@@ -5,6 +5,7 @@ use digest::{
     crypto_common::{KeyInit, KeySizeUser},
     MacMarker, OutputSizeUser,
 };
+use typenum::consts::{U16, U32};
 
 use crate::{compress, extract};
 
@@ -16,7 +17,7 @@ pub struct AsconMacCore {
 pub type AsconMac = CoreWrapper<AsconMacCore>;
 
 impl KeySizeUser for AsconMacCore {
-    type KeySize = typenum::consts::U16;
+    type KeySize = U16;
 }
 
 impl KeyInit for AsconMacCore {
@@ -29,7 +30,7 @@ impl KeyInit for AsconMacCore {
 }
 
 impl BlockSizeUser for AsconMacCore {
-    type BlockSize = typenum::consts::U32;
+    type BlockSize = U32;
 }
 
 impl BufferKindUser for AsconMacCore {
@@ -38,14 +39,12 @@ impl BufferKindUser for AsconMacCore {
 
 impl UpdateCore for AsconMacCore {
     fn update_blocks(&mut self, blocks: &[digest::core_api::Block<Self>]) {
-        for block in blocks {
-            compress(&mut self.state, block, 0);
-        }
+        blocks.iter().for_each(|b| compress(&mut self.state, b, 0));
     }
 }
 
 impl OutputSizeUser for AsconMacCore {
-    type OutputSize = typenum::consts::U16;
+    type OutputSize = U16;
 }
 
 impl FixedOutputCore for AsconMacCore {

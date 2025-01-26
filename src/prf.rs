@@ -7,8 +7,10 @@ use digest::{
     crypto_common::KeySizeUser,
     KeyInit,
 };
+use generic_array::sequence::Split;
+use typenum::consts::{U16, U32, U8};
 
-use crate::{compress, extract};
+use crate::{compress, extract, B};
 
 #[derive(Clone, Debug)]
 pub struct AsconPrfCore {
@@ -18,7 +20,7 @@ pub struct AsconPrfCore {
 pub type AsconPrf = CoreWrapper<AsconPrfCore>;
 
 impl KeySizeUser for AsconPrfCore {
-    type KeySize = typenum::consts::U16;
+    type KeySize = U16;
 }
 
 impl KeyInit for AsconPrfCore {
@@ -31,7 +33,7 @@ impl KeyInit for AsconPrfCore {
 }
 
 impl BlockSizeUser for AsconPrfCore {
-    type BlockSize = typenum::consts::U32;
+    type BlockSize = U32;
 }
 
 impl BufferKindUser for AsconPrfCore {
@@ -40,9 +42,7 @@ impl BufferKindUser for AsconPrfCore {
 
 impl UpdateCore for AsconPrfCore {
     fn update_blocks(&mut self, blocks: &[digest::core_api::Block<Self>]) {
-        for block in blocks {
-            compress(&mut self.state, block, 0);
-        }
+        blocks.iter().for_each(|b| compress(&mut self.state, b, 0));
     }
 }
 
@@ -62,12 +62,13 @@ impl ExtendableOutputCore for AsconPrfCore {
     }
 }
 
+#[derive(Clone, Debug)]
 pub struct AsconPrfReaderCore {
     state: State,
 }
 
 impl BlockSizeUser for AsconPrfReaderCore {
-    type BlockSize = typenum::consts::U16;
+    type BlockSize = U16;
 }
 
 impl XofReaderCore for AsconPrfReaderCore {
@@ -89,48 +90,37 @@ pub fn ascon_prf_short(key: [u8; 16], data: &[u8], output: &mut [u8]) {
         "ascon_prf_short is intended for short-outputs only"
     );
 
-    let mut m = [0; 16];
+    let mut m = B::default();
     m[..data.len()].copy_from_slice(data);
-    let t = ascon_prf_short_inner(key, data.len() as u64, output.len() as u64, &m);
+    let t = ascon_prf_short_inner(key.into(), data.len() as u64, output.len() as u64, m);
 
     let len = output.len();
     output[..len].copy_from_slice(&t[..len]);
 }
 
 pub fn ascon_prf_short_128(key: [u8; 16], data: &[u8; 16]) -> [u8; 16] {
-    ascon_prf_short_inner(key, 16, 16, data)
+    ascon_prf_short_inner(key.into(), 16, 16, (*data).into()).into()
 }
 
-fn ascon_prf_short_inner(key: [u8; 16], m: u64, t: u64, data: &[u8; 16]) -> [u8; 16] {
+fn ascon_prf_short_inner(key: B<U16>, m: u64, t: u64, data: B<U16>) -> B<U16> {
     const IV: u64 = 0x80004c0000000000;
     let iv = IV ^ (m << 51) ^ (t << 35);
 
-    let Some((k0, k1)) = key.split_first_chunk() else {
-        unreachable!()
-    };
-    let Some((k1, &[])) = k1.split_first_chunk() else {
-        unreachable!()
-    };
+    let (k0, k1): (B<U8>, B<U8>) = key.split();
+    let k0 = u64::from_be_bytes(k0.into());
+    let k1 = u64::from_be_bytes(k1.into());
 
-    let k0 = u64::from_be_bytes(*k0);
-    let k1 = u64::from_be_bytes(*k1);
-
-    let Some((m0, m1)) = data.split_first_chunk() else {
-        unreachable!()
-    };
-    let Some((m1, &[])) = m1.split_first_chunk() else {
-        unreachable!()
-    };
-
-    let m0 = u64::from_be_bytes(*m0);
-    let m1 = u64::from_be_bytes(*m1);
+    let (m0, m1): (B<U8>, B<U8>) = data.split();
+    let m0 = u64::from_be_bytes(m0.into());
+    let m1 = u64::from_be_bytes(m1.into());
 
     let mut state = State::new(iv, k0, k1, m0, m1);
     state.permute_12();
 
     let t0 = k0 ^ state[0];
     let t1 = k1 ^ state[1];
-    let mut t = [0; 16];
+
+    let mut t = B::default();
     t[0..8].copy_from_slice(&t0.to_be_bytes());
     t[8..16].copy_from_slice(&t1.to_be_bytes());
     t
