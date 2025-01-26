@@ -10,6 +10,9 @@ authors = ["Conrad Ludgate <conradludgate@gmail.com>"]
 [dependencies]
 ascon = "0.4.0"
 rand_core = "0.6"
+digest = { version = "0.10.7", features = ["mac"] }
+generic-array = "0.14"
+typenum = "1"
 
 [dev-dependencies]
 divan = "0.1.17"
