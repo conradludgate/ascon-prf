@@ -1,17 +1,46 @@
+use core::convert::Infallible;
+
 use ascon::State;
-use rand_core::{block::BlockRngCore, CryptoRng, SeedableRng};
+use rand_core::{
+    block::{BlockRng, Generator},
+    SeedableRng, TryCryptoRng, TryRng,
+};
 
 use crate::{compress, init};
 
+/// Block generator behind [`AsconPrng`].
 #[derive(Clone, Debug)]
-pub struct AsconPrng {
+pub struct AsconPrngCore {
     state: State,
 }
 
+impl AsconPrngCore {
+    fn feed(&mut self, trng: &[u8; 32]) {
+        compress(&mut self.state, trng.into(), 0);
+    }
+}
+
+impl Generator for AsconPrngCore {
+    type Output = [u64; 2];
+
+    fn generate(&mut self, output: &mut Self::Output) {
+        output[0] = self.state[0];
+        output[1] = self.state[1];
+        ascon::permute12(&mut self.state);
+    }
+}
+
+/// Sponge-based PRNG built on the Ascon permutation.
+#[derive(Clone, Debug)]
+pub struct AsconPrng(BlockRng<AsconPrngCore>);
+
 impl AsconPrng {
     /// Introduce new seed data from a true-rng source.
+    ///
+    /// Output buffered before the call is discarded.
     pub fn feed(&mut self, trng: &[u8; 32]) {
-        compress(&mut self.state, trng.into(), 0);
+        self.0.core.feed(trng);
+        self.0.reset_and_skip(0);
     }
 }
 
@@ -19,36 +48,44 @@ impl SeedableRng for AsconPrng {
     type Seed = [u8; 16];
 
     fn from_seed(seed: Self::Seed) -> Self {
-        Self {
+        Self(BlockRng::new(AsconPrngCore {
             state: init(0x80808c0000000000_u64.to_be(), &seed.into()),
-        }
+        }))
     }
 }
 
-impl BlockRngCore for AsconPrng {
-    type Item = u64;
-    type Results = [u64; 2];
+impl TryRng for AsconPrng {
+    type Error = Infallible;
 
-    fn generate(&mut self, results: &mut Self::Results) {
-        results[0] = self.state[0];
-        results[1] = self.state[1];
-        self.state.permute_12();
+    #[inline]
+    fn try_next_u32(&mut self) -> Result<u32, Infallible> {
+        Ok(self.0.next_word() as u32)
+    }
+
+    #[inline]
+    fn try_next_u64(&mut self) -> Result<u64, Infallible> {
+        Ok(self.0.next_word())
+    }
+
+    #[inline]
+    fn try_fill_bytes(&mut self, dest: &mut [u8]) -> Result<(), Infallible> {
+        self.0.fill_bytes(dest);
+        Ok(())
     }
 }
 
-impl CryptoRng for AsconPrng {}
+impl TryCryptoRng for AsconPrng {}
 
 #[cfg(test)]
 mod tests {
-    use rand_core::{block::BlockRng64, RngCore, SeedableRng};
+    use rand_core::{Rng, SeedableRng};
 
     use super::AsconPrng;
 
     #[test]
     fn verify() {
-        let mut rng = BlockRng64::<AsconPrng>::from_seed([0x55; 16]);
-        rng.core.feed(b"hello world                     ");
-        rng.reset();
+        let mut rng = AsconPrng::from_seed([0x55; 16]);
+        rng.feed(b"hello world                     ");
 
         let mut buf = [0u8; 64];
         rng.fill_bytes(&mut buf);
@@ -77,9 +114,8 @@ mod tests {
 
     #[test]
     fn verify_reseed() {
-        let mut rng = BlockRng64::<AsconPrng>::from_seed([0x55; 16]);
-        rng.core.feed(b"hello world                     ");
-        rng.reset();
+        let mut rng = AsconPrng::from_seed([0x55; 16]);
+        rng.feed(b"hello world                     ");
 
         let mut buf = [0u8; 64];
         rng.fill_bytes(&mut buf);
@@ -93,8 +129,7 @@ mod tests {
             ]
         );
 
-        rng.core.feed(b"goodbye world                   ");
-        rng.reset();
+        rng.feed(b"goodbye world                   ");
 
         let mut buf = [0u8; 64];
         rng.fill_bytes(&mut buf);
