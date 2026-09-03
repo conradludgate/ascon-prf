@@ -1,13 +1,13 @@
 use ascon::State;
 use digest::{
-    block_buffer::Eager,
-    core_api::{
-        AlgorithmName, BlockSizeUser, BufferKindUser, CoreWrapper, FixedOutputCore, UpdateCore,
+    block_api::{
+        AlgorithmName, Block, BlockSizeUser, Buffer, BufferKindUser, Eager, FixedOutputCore,
+        UpdateCore,
     },
-    crypto_common::{KeyInit, KeySizeUser},
-    MacMarker, OutputSizeUser,
+    common::KeySizeUser,
+    consts::{U16, U32},
+    KeyInit, MacMarker, Output, OutputSizeUser,
 };
-use typenum::consts::{U16, U32};
 
 use crate::{compress, extract};
 
@@ -16,7 +16,11 @@ pub struct AsconMacCore {
     state: State,
 }
 
-pub type AsconMac = CoreWrapper<AsconMacCore>;
+digest::buffer_fixed!(
+    /// Ascon-Mac
+    pub struct AsconMac(AsconMacCore);
+    impl: MacTraits KeyInit AlgorithmName Clone;
+);
 
 impl KeySizeUser for AsconMacCore {
     type KeySize = U16;
@@ -47,7 +51,7 @@ impl BufferKindUser for AsconMacCore {
 }
 
 impl UpdateCore for AsconMacCore {
-    fn update_blocks(&mut self, blocks: &[digest::core_api::Block<Self>]) {
+    fn update_blocks(&mut self, blocks: &[Block<Self>]) {
         blocks.iter().for_each(|b| compress(&mut self.state, b, 0));
     }
 }
@@ -57,11 +61,7 @@ impl OutputSizeUser for AsconMacCore {
 }
 
 impl FixedOutputCore for AsconMacCore {
-    fn finalize_fixed_core(
-        &mut self,
-        buffer: &mut digest::core_api::Buffer<Self>,
-        out: &mut digest::Output<Self>,
-    ) {
+    fn finalize_fixed_core(&mut self, buffer: &mut Buffer<Self>, out: &mut Output<Self>) {
         buffer.digest_pad(0x01, &[], |block| {
             compress(&mut self.state, block, 1);
         });
@@ -73,7 +73,7 @@ impl MacMarker for AsconMacCore {}
 
 #[cfg(test)]
 mod tests {
-    use digest::Mac;
+    use digest::{KeyInit, Mac};
 
     use super::AsconMac;
 

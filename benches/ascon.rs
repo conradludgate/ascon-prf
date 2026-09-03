@@ -1,7 +1,7 @@
 use divan::{black_box, counter::BytesCount, Bencher};
 
 use ascon_prng::{ascon_prf_short_128, AsconMac, AsconPrf, AsconPrng};
-use rand_core::{block::BlockRng64, RngCore, SeedableRng};
+use rand_core::{Rng, SeedableRng};
 
 fn main() {
     // Run registered benchmarks.
@@ -23,7 +23,7 @@ fn prng_feed(b: Bencher) {
 #[divan::bench(args = [1, 2, 4, 16, 256, 4096], sample_count=1000, sample_size=1000)]
 fn prng_fetch(b: Bencher, len: usize) {
     let mut v = vec![0u8; len];
-    let prng = BlockRng64::new(AsconPrng::from_seed([0; 16]));
+    let prng = AsconPrng::from_seed([0; 16]);
     b.counter(BytesCount::of_slice(&v))
         .bench_local(|| prng.clone().fill_bytes(&mut v));
 }
@@ -61,7 +61,7 @@ fn prf_short() -> [u8; 16] {
 
 #[divan::bench(args = [1, 2, 4, 16, 256, 4096], sample_count=1000, sample_size=1000)]
 fn mac(b: Bencher, len: usize) {
-    use digest::Mac;
+    use digest::{KeyInit, Mac};
 
     let v = vec![0u8; len];
     b.counter(BytesCount::of_slice(&v)).bench(|| -> [u8; 16] {

@@ -1,5 +1,5 @@
 use ascon_prng::AsconMac;
-use digest::{FixedOutput, Mac};
+use digest::{FixedOutput, KeyInit, Mac};
 use libtest_mimic::{run, Arguments, Trial};
 use serde::Deserialize;
 
